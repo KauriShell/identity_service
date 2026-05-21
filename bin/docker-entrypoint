@@ -1,0 +1,64 @@
+#!/bin/sh -e
+
+# Serialize db:prepare across containers (app + jobs, or scaled app) that share the DB.
+# Parallel schema loads cause duplicate citext / CREATE TABLE races.
+db_prepare() {
+  mkdir -p tmp
+  flock /rails/tmp/db_prepare.lock ./bin/rails db:prepare
+}
+
+db_seed() {
+  mkdir -p tmp
+  flock /rails/tmp/db_seed.lock ./bin/rails db:seed
+}
+
+wait_for_postgres() {
+  if [ -n "${DATABASE_URL}" ]; then
+    echo "Waiting for Postgres..."
+    until pg_isready -d "${DATABASE_URL}" >/dev/null 2>&1; do
+      sleep 1
+    done
+  fi
+}
+
+# Parse redis://[user:password@]host:port[/db] — no redis-cli required in the image
+wait_for_redis() {
+  if [ -z "${REDIS_URL}" ]; then
+    return 0
+  fi
+
+  echo "Waiting for Redis..."
+  _rest="${REDIS_URL#redis://}"
+  _rest="${_rest#*@}"
+  _host="${_rest%%:*}"
+  _port="${_rest#*:}"
+  _port="${_port%%/*}"
+
+  if [ -z "${_port}" ] || [ "${_host}" = "${_port}" ]; then
+    _port=6379
+  fi
+
+  until nc -z "${_host}" "${_port}" 2>/dev/null; do
+    sleep 1
+  done
+}
+
+# If running the rails server then create or migrate existing database
+if [ "${1}" = "./bin/rails" ] && [ "${2}" = "server" ]; then
+  # Bind-mounted tmp can retain a stale PID between container restarts.
+  if [ -f /rails/tmp/pids/server.pid ]; then
+    rm /rails/tmp/pids/server.pid
+  fi
+  wait_for_postgres
+  wait_for_redis
+  db_prepare
+  db_seed
+fi
+
+# Solid Queue worker: needs schema (same DB as primary when using merged solid_queue migration)
+if [ "${1}" = "./bin/jobs" ]; then
+  wait_for_postgres
+  db_prepare
+fi
+
+exec "$@"

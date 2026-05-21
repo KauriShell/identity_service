@@ -1,0 +1,99 @@
+require "active_support/core_ext/integer/time"
+
+# The test environment is used exclusively to run your application's
+# test suite. You never need to work with it otherwise. Remember that
+# your test database is "scratch space" for the test suite and is wiped
+# and recreated between test runs. Don't rely on the data there!
+
+Rails.application.configure do
+  # Settings specified here will take precedence over those in config/application.rb.
+
+  # While tests run files are not watched, reloading is not necessary.
+  config.enable_reloading = false
+
+  # Eager loading loads your entire application. When running a single test locally,
+  # this is usually not necessary, and can slow down your test suite. However, it's
+  # recommended that you enable it in continuous integration systems to ensure eager
+  # loading is working properly before deploying your code.
+  config.eager_load = ENV["CI"].present?
+
+  # Configure public file server for tests with Cache-Control for performance.
+  config.public_file_server.enabled = true
+  config.public_file_server.headers = {
+    "Cache-Control" => "public, max-age=#{1.hour.to_i}"
+  }
+
+  # Show full error reports and disable caching.
+  config.consider_all_requests_local = true
+  config.action_controller.perform_caching = false
+  config.cache_store = :null_store
+
+  # Render exception templates for rescuable exceptions and raise for other exceptions.
+  config.action_dispatch.show_exceptions = :rescuable
+
+  # Disable request forgery protection in test environment.
+  config.action_controller.allow_forgery_protection = false
+
+  # Store uploaded files on the local file system in a temporary directory.
+  config.active_storage.service = :test
+
+  config.active_job.queue_adapter = :test
+
+  config.action_mailer.perform_caching = false
+
+  # Tell Action Mailer not to deliver emails to the real world by default.
+  # The :test delivery method accumulates sent emails in the
+  # ActionMailer::Base.deliveries array (no network).
+  #
+  # Set MAILPIT_SMTP=1 to route emails to Mailpit even in test (useful when
+  # running integration/system tests against a Docker compose stack).
+  if ENV["MAILPIT_SMTP"].to_s == "1"
+    config.action_mailer.delivery_method = :smtp
+    config.action_mailer.smtp_settings = {
+      address: ENV.fetch("MAILPIT_HOST", "mailpit"),
+      port: ENV.fetch("MAILPIT_PORT", "1025").to_i,
+      domain: ENV.fetch("MAILPIT_DOMAIN", "mailpit"),
+      enable_starttls_auto: false
+    }
+
+    if ENV["MAILPIT_USER"].present?
+      config.action_mailer.smtp_settings[:authentication] = :plain
+      config.action_mailer.smtp_settings[:user_name] = ENV["MAILPIT_USER"]
+      config.action_mailer.smtp_settings[:password] = ENV["MAILPIT_PASS"]
+    end
+  else
+    config.action_mailer.delivery_method = :test
+  end
+
+  config.action_mailer.default_url_options = {
+    host: ENV.fetch("DEFAULT_URL_HOST", "localhost"),
+    port: ENV.fetch("DEFAULT_URL_PORT", 3000)
+  }
+
+  # Print deprecation notices to the stderr.
+  config.active_support.deprecation = :stderr
+
+  # Raise exceptions for disallowed deprecations.
+  config.active_support.disallowed_deprecation = :raise
+
+  # Tell Active Support which deprecation messages to disallow.
+  config.active_support.disallowed_deprecation_warnings = []
+
+  # Raises error for missing translations.
+  # config.i18n.raise_on_missing_translations = true
+
+  # Annotate rendered view with file names.
+  # config.action_view.annotate_rendered_view_with_filenames = true
+
+  # Raise error when a before_action's only/except options reference missing actions
+  config.action_controller.raise_on_missing_callback_actions = true
+
+  # Rack::Attack defaults to Redis (shared with other data); use a memory store in test so
+  # throttle examples can reset safely without flushing JWT denylist keys.
+  config.after_initialize do
+    Rack::Attack.cache.store = ActiveSupport::Cache::MemoryStore.new
+  end
+
+  # Avoid host authorization noise in request specs.
+  config.hosts.clear
+end

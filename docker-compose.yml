@@ -1,0 +1,188 @@
+#
+# Deprecated for repo-wide boot.
+# Use `docker compose up --build` from the repo root — that file runs identity,
+# escrow (with Postgres primary + replica), trustbridge, mailpit, and Redis together.
+#
+services:
+  app:
+    container_name: app
+    build:
+      context: .
+      target: development
+      args:
+        BUNDLE_WITHOUT: ""
+    env_file:
+      - .env
+    environment:
+      RAILS_ENV: development
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/identity_service_development}
+      DATABASE_URL_TEST: ${DATABASE_URL_TEST:-postgresql://postgres:postgres@postgres:5432/identity_service_test}
+      REDIS_URL: ${REDIS_URL:-redis://:change-me@redis:6379/0}
+      DEVISE_JWT_SECRET_KEY: ${DEVISE_JWT_SECRET_KEY:-change-me}
+      DEVISE_PEPPER: ${DEVISE_PEPPER:-change-me}
+      SERVICE_TOKEN_SALT: ${SERVICE_TOKEN_SALT:-change-me}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost}
+      DEFAULT_URL_HOST: ${DEFAULT_URL_HOST:-localhost}
+      DEFAULT_URL_PORT: ${DEFAULT_URL_PORT:-3000}
+      DEFAULT_URL_PROTOCOL: ${DEFAULT_URL_PROTOCOL:-http}
+      AWS_BUCKET: ${AWS_BUCKET:-identity-service-bucket}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-local}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-local}
+      AWS_KMS_KEY_ID: ${AWS_KMS_KEY_ID:-local}
+      USE_SOLID_QUEUE: ${USE_SOLID_QUEUE:-1}
+      JOB_CONCURRENCY: ${JOB_CONCURRENCY:-1}
+      KYC_JOB_CONCURRENCY: ${KYC_JOB_CONCURRENCY:-1}
+      MAILPIT_HOST: ${MAILPIT_HOST:-mailpit}
+      MAILPIT_PORT: ${MAILPIT_PORT:-1025}
+      MISSION_CONTROL_JOBS_USER: ${MISSION_CONTROL_JOBS_USER:-dev}
+      MISSION_CONTROL_JOBS_PASSWORD: ${MISSION_CONTROL_JOBS_PASSWORD:-change-me}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:3000/api/v1/health >/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/rails
+
+  jobs:
+    container_name: jobs
+    build:
+      context: .
+      target: development
+      args:
+        BUNDLE_WITHOUT: ""
+    env_file:
+      - .env
+    environment:
+      RAILS_ENV: development
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/identity_service_development}
+      DATABASE_URL_TEST: ${DATABASE_URL_TEST:-postgresql://postgres:postgres@postgres:5432/identity_service_test}
+      REDIS_URL: ${REDIS_URL:-redis://:change-me@redis:6379/0}
+      DEVISE_JWT_SECRET_KEY: ${DEVISE_JWT_SECRET_KEY:-change-me}
+      DEVISE_PEPPER: ${DEVISE_PEPPER:-change-me}
+      SERVICE_TOKEN_SALT: ${SERVICE_TOKEN_SALT:-change-me}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost}
+      DEFAULT_URL_HOST: ${DEFAULT_URL_HOST:-localhost}
+      DEFAULT_URL_PORT: ${DEFAULT_URL_PORT:-3000}
+      DEFAULT_URL_PROTOCOL: ${DEFAULT_URL_PROTOCOL:-http}
+      AWS_BUCKET: ${AWS_BUCKET:-identity-service-bucket}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-local}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-local}
+      AWS_KMS_KEY_ID: ${AWS_KMS_KEY_ID:-local}
+      USE_SOLID_QUEUE: ${USE_SOLID_QUEUE:-1}
+      JOB_CONCURRENCY: ${JOB_CONCURRENCY:-1}
+      KYC_JOB_CONCURRENCY: ${KYC_JOB_CONCURRENCY:-1}
+      MAILPIT_HOST: ${MAILPIT_HOST:-mailpit}
+      MAILPIT_PORT: ${MAILPIT_PORT:-1025}
+      MISSION_CONTROL_JOBS_USER: ${MISSION_CONTROL_JOBS_USER:-dev}
+      MISSION_CONTROL_JOBS_PASSWORD: ${MISSION_CONTROL_JOBS_PASSWORD:-change-me}
+    depends_on:
+      app:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      # Worker health: make sure DB + Redis are reachable.
+      # This doesn't validate queue processing, but it prevents "dead" containers
+      # from being treated as healthy.
+      test: ["CMD-SHELL", "pg_isready -h postgres -U postgres >/dev/null 2>&1 && nc -z redis 6379 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    command: ["./bin/jobs"]
+    volumes:
+      - .:/rails
+
+  postgres:
+    container_name: postgres
+    image: postgres:16
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-identity_service_development}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    container_name: redis
+    image: redis:7
+    env_file:
+      - .env
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-change-me}"]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-change-me}
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD:-change-me} ping | grep PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mailpit:
+    container_name: mailpit
+    image: axllent/mailpit:latest
+    healthcheck:
+      # `mailpit readyz` checks the already-running server's /readyz endpoint.
+      # Use CMD-SHELL so we can invoke the /mailpit binary reliably.
+      test: ["CMD-SHELL", "/mailpit readyz >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+    # Mailpit SMTP (1025) is unauthenticated by default.
+
+  trustbridge:
+    container_name: trustbridge
+    build:
+      context: ../trustbridge
+      dockerfile: Dockerfile
+    environment:
+      NEXT_PUBLIC_IDENTITY_SERVICE_ORIGIN: http://localhost:3000
+      WATCHPACK_POLLING: "true"
+    depends_on:
+      app:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mailpit:
+        condition: service_healthy
+    ports:
+      - "3001:3000"
+    volumes:
+      - ../trustbridge:/app
+      - /app/node_modules
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:3000/ >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+volumes:
+  postgres_data:
