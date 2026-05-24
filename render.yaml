@@ -1,4 +1,5 @@
 # identity_service on Render (NOT Vercel). Blueprint: Render Dashboard → New → Blueprint.
+# Dockerfile last stage is `production` — no dockerTarget field needed on Render.
 # After deploy, set ALLOWED_ORIGINS to your Vercel URL(s) in the web service env.
 
 services:
@@ -104,54 +105,68 @@ services:
     envVars:
       - key: RAILS_ENV
         value: production
-      - fromService:
+      - key: DATABASE_URL
+        fromService:
           type: web
           name: trustbridge-identity
           envVarKey: DATABASE_URL
-      - fromService:
+      - key: DATABASE_PRIMARY_HOST
+        fromService:
           type: web
           name: trustbridge-identity
           envVarKey: DATABASE_PRIMARY_HOST
-      - fromService:
+      - key: DATABASE_PRIMARY_PORT
+        fromService:
           type: web
           name: trustbridge-identity
           envVarKey: DATABASE_PRIMARY_PORT
-      - fromService:
+      - key: DATABASE_USERNAME
+        fromService:
           type: web
           name: trustbridge-identity
           envVarKey: DATABASE_USERNAME
-      - fromService:
+      - key: DATABASE_PASSWORD
+        fromService:
           type: web
           name: trustbridge-identity
           envVarKey: DATABASE_PASSWORD
-      - fromService:
+      - key: DATABASE_NAME
+        fromService:
           type: web
           name: trustbridge-identity
           envVarKey: DATABASE_NAME
-      - fromService:
+      - key: REDIS_URL
+        fromService:
           type: web
           name: trustbridge-identity
           envVarKey: REDIS_URL
-      - fromService:
+      - key: RAILS_MASTER_KEY
+        fromService:
           type: web
           name: trustbridge-identity
           envVarKey: RAILS_MASTER_KEY
-      - fromService:
+      - key: DEVISE_JWT_SECRET_KEY
+        fromService:
           type: web
           name: trustbridge-identity
           envVarKey: DEVISE_JWT_SECRET_KEY
-      - fromService:
+      - key: DEVISE_PEPPER
+        fromService:
           type: web
           name: trustbridge-identity
           envVarKey: DEVISE_PEPPER
-      - fromService:
+      - key: SERVICE_TOKEN_SALT
+        fromService:
           type: web
           name: trustbridge-identity
           envVarKey: SERVICE_TOKEN_SALT
-      - fromService:
+      - key: SECRET_KEY_BASE
+        fromService:
           type: web
           name: trustbridge-identity
           envVarKey: SECRET_KEY_BASE
+      - key: USE_SOLID_QUEUE
+        value: "1"
 
   - type: redis
     name: trustbridge-identity-redis
