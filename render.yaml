@@ -9,7 +9,6 @@ services:
     region: frankfurt
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    dockerTarget: production
     healthCheckPath: /api/v1/health
     envVars:
       - key: RAILS_ENV
