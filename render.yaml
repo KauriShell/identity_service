@@ -100,7 +100,6 @@ services:
     region: frankfurt
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    dockerTarget: production
     dockerCommand: ./bin/jobs
     envVars:
       - key: RAILS_ENV
