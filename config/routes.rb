@@ -1,4 +1,8 @@
 Rails.application.routes.draw do
+  # Platform health probes (Railway, Render, Fly, k8s) often hit / or /up
+  root to: redirect("/api/v1/health")
+  get "/up", to: redirect("/api/v1/health")
+
   namespace :api do
     namespace :v1 do
       devise_for :users,

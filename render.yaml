@@ -1,0 +1,170 @@
+# identity_service on Render (NOT Vercel). Blueprint: Render Dashboard → New → Blueprint.
+# After deploy, set ALLOWED_ORIGINS to your Vercel URL(s) in the web service env.
+
+services:
+  - type: web
+    name: trustbridge-identity
+    runtime: docker
+    plan: starter
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerTarget: production
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: RAILS_ENV
+        value: production
+      - key: RAILS_LOG_LEVEL
+        value: info
+      - key: DATABASE_URL
+        fromDatabase:
+          name: trustbridge-identity-db
+          property: connectionString
+      - key: DATABASE_PRIMARY_HOST
+        fromDatabase:
+          name: trustbridge-identity-db
+          property: host
+      - key: DATABASE_PRIMARY_PORT
+        fromDatabase:
+          name: trustbridge-identity-db
+          property: port
+      - key: DATABASE_USERNAME
+        fromDatabase:
+          name: trustbridge-identity-db
+          property: user
+      - key: DATABASE_PASSWORD
+        fromDatabase:
+          name: trustbridge-identity-db
+          property: password
+      - key: DATABASE_NAME
+        fromDatabase:
+          name: trustbridge-identity-db
+          property: database
+      - key: DATABASE_REPLICA_HOST
+        fromDatabase:
+          name: trustbridge-identity-db
+          property: host
+      - key: DATABASE_REPLICA_PORT
+        fromDatabase:
+          name: trustbridge-identity-db
+          property: port
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: trustbridge-identity-redis
+          property: connectionString
+      - key: SECRET_KEY_BASE
+        generateValue: true
+      - key: RAILS_MASTER_KEY
+        sync: false
+      - key: DEVISE_JWT_SECRET_KEY
+        sync: false
+      - key: DEVISE_PEPPER
+        generateValue: true
+      - key: SERVICE_TOKEN_SALT
+        generateValue: true
+      - key: IDENTITY_SERVICE_TOKEN
+        sync: false
+      - key: ALLOWED_HOSTS
+        fromService:
+          type: web
+          name: trustbridge-identity
+          property: host
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: DEFAULT_URL_HOST
+        fromService:
+          type: web
+          name: trustbridge-identity
+          property: host
+      - key: DEFAULT_URL_PROTOCOL
+        value: https
+      - key: AWS_BUCKET
+        sync: false
+      - key: AWS_REGION
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_KMS_KEY_ID
+        sync: false
+      - key: MISSION_CONTROL_JOBS_PASSWORD
+        generateValue: true
+      - key: USE_SOLID_QUEUE
+        value: "1"
+
+  - type: worker
+    name: trustbridge-identity-jobs
+    runtime: docker
+    plan: starter
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    dockerTarget: production
+    dockerCommand: ./bin/jobs
+    envVars:
+      - key: RAILS_ENV
+        value: production
+      - fromService:
+          type: web
+          name: trustbridge-identity
+          envVarKey: DATABASE_URL
+      - fromService:
+          type: web
+          name: trustbridge-identity
+          envVarKey: DATABASE_PRIMARY_HOST
+      - fromService:
+          type: web
+          name: trustbridge-identity
+          envVarKey: DATABASE_PRIMARY_PORT
+      - fromService:
+          type: web
+          name: trustbridge-identity
+          envVarKey: DATABASE_USERNAME
+      - fromService:
+          type: web
+          name: trustbridge-identity
+          envVarKey: DATABASE_PASSWORD
+      - fromService:
+          type: web
+          name: trustbridge-identity
+          envVarKey: DATABASE_NAME
+      - fromService:
+          type: web
+          name: trustbridge-identity
+          envVarKey: REDIS_URL
+      - fromService:
+          type: web
+          name: trustbridge-identity
+          envVarKey: RAILS_MASTER_KEY
+      - fromService:
+          type: web
+          name: trustbridge-identity
+          envVarKey: DEVISE_JWT_SECRET_KEY
+      - fromService:
+          type: web
+          name: trustbridge-identity
+          envVarKey: DEVISE_PEPPER
+      - fromService:
+          type: web
+          name: trustbridge-identity
+          envVarKey: SERVICE_TOKEN_SALT
+      - fromService:
+          type: web
+          name: trustbridge-identity
+          envVarKey: SECRET_KEY_BASE
+
+  - type: redis
+    name: trustbridge-identity-redis
+    plan: starter
+    region: frankfurt
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
+
+databases:
+  - name: trustbridge-identity-db
+    plan: starter
+    region: frankfurt
+    databaseName: identity_service_production
+    user: identity

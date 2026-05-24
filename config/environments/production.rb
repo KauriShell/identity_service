@@ -75,6 +75,9 @@ Rails.application.configure do
 
   allowed_hosts = ENV.fetch("ALLOWED_HOSTS").split(",").map(&:strip).reject(&:empty?)
   config.hosts = allowed_hosts
+  config.host_authorization = {
+    exclude: ->(request) { request.path.in?(%w[/ /up /api/v1/health]) }
+  }
 
   # Ignore bad email addresses and do not raise email delivery errors.
   # Set this to true and configure the email server for immediate delivery to raise delivery errors.

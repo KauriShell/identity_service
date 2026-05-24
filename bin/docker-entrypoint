@@ -14,8 +14,20 @@ db_seed() {
 
 wait_for_postgres() {
   if [ -n "${DATABASE_URL}" ]; then
-    echo "Waiting for Postgres..."
+    echo "Waiting for Postgres (DATABASE_URL)..."
     until pg_isready -d "${DATABASE_URL}" >/dev/null 2>&1; do
+      sleep 1
+    done
+    return 0
+  fi
+
+  if [ -n "${DATABASE_PRIMARY_HOST}" ]; then
+    _pg_host="${DATABASE_PRIMARY_HOST}"
+    _pg_port="${DATABASE_PRIMARY_PORT:-5432}"
+    _pg_user="${DATABASE_USERNAME:-postgres}"
+    export PGPASSWORD="${DATABASE_PASSWORD:-}"
+    echo "Waiting for Postgres (${_pg_host}:${_pg_port})..."
+    until pg_isready -h "${_pg_host}" -p "${_pg_port}" -U "${_pg_user}" >/dev/null 2>&1; do
       sleep 1
     done
   fi

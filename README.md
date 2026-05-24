@@ -68,12 +68,41 @@ cp .env.example .env
 
 | Variable | Notes |
 |----------|--------|
-| `DATABASE_URL` | Postgres |
-| `REDIS_URL` | Sessions, denylist, cache |
+| `DATABASE_*` | Postgres primary + replica (see `.env.example`) |
+| `REDIS_URL` | Denylist, cache, Rack::Attack |
 | `DEVISE_JWT_SECRET_KEY` | **Shared** with escrow + payment |
+| `IDENTITY_SERVICE_TOKEN` | Service tenant token (match `escrow_service`) |
 | `DEVISE_PEPPER` / `SERVICE_TOKEN_SALT` | Credential hashing |
 | `AWS_*` | KYC document storage (S3 + KMS) |
+| `ALLOWED_ORIGINS` / `ALLOWED_HOSTS` | CORS and host allowlist |
 | `MISSION_CONTROL_JOBS_USER/PASSWORD` | `/jobs` basic auth |
+
+## Deployment
+
+### Vercel
+
+**This repo cannot run on Vercel.** A `404: NOT_FOUND` with ID `cpt1::…` means Vercel has no app output for that URL.
+
+Deploy **`trustbridge`** on Vercel and host identity elsewhere. See `trustbridge/docs/VERCEL_DEPLOY.md`.
+
+### Recommended hosts (Docker)
+
+- **Render** — use `render.yaml` in this repo (Blueprint deploy)
+- **Railway / Fly.io** — `Dockerfile` target `production`, port `3000`
+- **Local full stack** — root `docker compose up identity identity_jobs`
+
+### Health check URL
+
+Configure the platform probe to one of:
+
+- `GET /api/v1/health` (recommended)
+- `GET /up` or `GET /` (redirect to health)
+
+### Required production env
+
+Set at minimum: `SECRET_KEY_BASE`, `RAILS_MASTER_KEY`, `DEVISE_JWT_SECRET_KEY`, `DEVISE_PEPPER`, `SERVICE_TOKEN_SALT`, `ALLOWED_HOSTS` (include your public hostname), `DATABASE_*`, `REDIS_URL`, `AWS_*`, and a strong `MISSION_CONTROL_JOBS_PASSWORD`.
+
+`ALLOWED_HOSTS` must include the hostname users hit (e.g. `identity-api.example.com`). Omitting it causes blocked requests in production (not Vercel’s HTML 404).
 
 ## Docker
 

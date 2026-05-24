@@ -81,18 +81,26 @@ test:
 production:
   primary:
     <<: *default
+<% if ENV["DATABASE_URL"].present? %>
+    url: <%= ENV["DATABASE_URL"] %>
+<% else %>
     database: <%= ENV.fetch("DATABASE_NAME", "identity_service_production") %>
     host: <%= ENV["DATABASE_PRIMARY_HOST"] %>
     port: <%= ENV.fetch("DATABASE_PRIMARY_PORT", "5432") %>
     username: <%= ENV["DATABASE_USERNAME"] %>
     password: <%= ENV["DATABASE_PASSWORD"] %>
+<% end %>
     pool: <%= ENV.fetch("DATABASE_POOL", "10") %>
   primary_replica:
     <<: *default
+<% if ENV["DATABASE_URL"].present? %>
+    url: <%= ENV["DATABASE_URL"] %>
+<% else %>
     database: <%= ENV.fetch("DATABASE_NAME", "identity_service_production") %>
     host: <%= ENV["DATABASE_REPLICA_HOST"] %>
     port: <%= ENV.fetch("DATABASE_REPLICA_PORT", "5432") %>
     username: <%= ENV["DATABASE_USERNAME"] %>
     password: <%= ENV["DATABASE_PASSWORD"] %>
+<% end %>
     pool: <%= ENV.fetch("DATABASE_POOL", "10") %>
     replica: true
